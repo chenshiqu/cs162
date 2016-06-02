@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "tokenizer.h"
 
@@ -26,6 +27,8 @@ pid_t shell_pgid;
 
 int cmd_exit(struct tokens *tokens);
 int cmd_help(struct tokens *tokens);
+int cmd_pwd(struct tokens *tokens);
+int cmd_cd(struct tokens *tokens);
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -40,6 +43,8 @@ typedef struct fun_desc {
 fun_desc_t cmd_table[] = {
   {cmd_help, "?", "show this help menu"},
   {cmd_exit, "exit", "exit the command shell"},
+	{cmd_pwd,"pwd","print the current working path"},
+	{cmd_cd, "cd", "change the current working directory"},
 };
 
 /* Prints a helpful description for the given command */
@@ -52,6 +57,45 @@ int cmd_help(struct tokens *tokens) {
 /* Exits this shell */
 int cmd_exit(struct tokens *tokens) {
   exit(0);
+}
+
+/* print the current working path */
+int cmd_pwd(struct tokens *tokens)
+{
+	char cwd[1024];
+	if(getcwd(cwd,sizeof(cwd)))
+	{
+		printf("%s\n",cwd);
+		return 1;
+	}
+	else
+	{
+		printf("%s","error");
+		return 0;
+	}
+}
+
+/*change the current working directory*/
+int cmd_cd(struct tokens *tokens)
+{
+	char *b=tokens_get_token(tokens,1);
+	struct stat sb;
+	if(stat(b,&sb)==0 && S_ISDIR(sb.st_mode))
+	{
+		if(chdir(b)==0)
+		{
+			return 1;
+		}
+		else
+		{
+			printf("error");
+		}
+	}
+	else
+	{	
+		printf("no such directory");
+	}	
+	return 1;	
 }
 
 /* Looks up the built-in command, if it exists. */
