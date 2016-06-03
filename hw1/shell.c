@@ -132,6 +132,19 @@ void init_shell() {
   }
 }
 
+/*find cmd in the path*/
+void get_cmd(char* c,char* a)
+{
+	char *md=strrchr(c,'/');
+	int length=strlen(md);
+	int i=0;
+	while(i<length-1)
+	{
+		a[i]=md[i+1];
+		i++;
+	}
+}
+
 int main(int argc, char *argv[]) {
   init_shell();
 
@@ -153,8 +166,42 @@ int main(int argc, char *argv[]) {
       cmd_table[fundex].fun(tokens);
     } else {
       /* REPLACE this to run commands as programs. */
-      fprintf(stdout, "This shell doesn't know how to run programs.\n");
-    }
+      //fprintf(stdout, "This shell doesn't know how to run programs.\n");
+		char *path=tokens_get_token(tokens,0);
+		struct stat sb;
+		if(stat(path,&sb)==0 && S_ISREG(sb.st_mode))
+		{
+			pid_t fpid;
+			fpid=fork();
+			if(fpid < 0)
+			{
+				printf("error in fork");
+			}	
+			else if(fpid==0)
+			{
+				size_t length=tokens_get_length(tokens);
+				char *arg[length];
+				get_cmd(path,arg[0]);
+				size_t i=1;
+				while(i<length)
+				{
+					arg[i]=tokens_get_token(tokens,i);
+					i++;
+				}
+				arg[length]=NULL;
+				execv(path,arg);
+			}
+			else
+			{
+				wait(NULL);
+			}
+
+		}
+		else
+		{	
+			printf("no such directory\n");
+		}
+	}
 
     if (shell_is_interactive)
       /* Please only print shell prompts when standard input is not a tty */
