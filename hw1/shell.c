@@ -145,6 +145,22 @@ void get_cmd(char* c,char* a)
 	}
 }
 
+int get_num_path(char *path)
+{
+	int num=0;
+	int i=0;
+	int len=strlen(path);
+	while(i<len)
+	{
+		if(path[i]==':' || i==(len-1))
+		{
+			num++;
+		}
+		i++;
+	}
+	return num;
+}
+
 int main(int argc, char *argv[]) {
   init_shell();
 
@@ -168,7 +184,9 @@ int main(int argc, char *argv[]) {
       /* REPLACE this to run commands as programs. */
       //fprintf(stdout, "This shell doesn't know how to run programs.\n");
 		char *path=tokens_get_token(tokens,0);
+		//structure that store the information of file and directory in the system
 		struct stat sb;
+		// whether the path is a regular file 
 		if(stat(path,&sb)==0 && S_ISREG(sb.st_mode))
 		{
 			pid_t fpid;
@@ -183,11 +201,13 @@ int main(int argc, char *argv[]) {
 				char *arg[length];
 				get_cmd(path,arg[0]);
 				size_t i=1;
+				//get arguments of the cmd from input
 				while(i<length)
 				{
 					arg[i]=tokens_get_token(tokens,i);
 					i++;
 				}
+				//the last item of the array of the exec function should be NULL 
 				arg[length]=NULL;
 				execv(path,arg);
 			}
@@ -198,8 +218,94 @@ int main(int argc, char *argv[]) {
 
 		}
 		else
-		{	
-			printf("no such directory\n");
+		{
+			//get $PATH of the system	
+			char *pathbuf;
+			size_t n;
+			n=confstr(_CS_PATH,NULL,(size_t)0);
+			pathbuf=malloc(n);
+			if(pathbuf==NULL)
+				abort();
+			confstr(_CS_PATH,pathbuf,n);
+			
+			//transfer to array
+			int len=strlen(pathbuf);
+			char p[len];
+			int i=0;
+			while(i<len)
+			{
+				p[i]=pathbuf[i];
+				i++;
+			}
+			
+			//get the the number of path
+			int num=get_num_path(pathbuf);
+			printf("%d\n",num);
+			
+			//separate each path 
+			char delims[]=":";
+			char *result=NULL;
+			char *path_array[num];
+			i=0;
+			result=strtok(p,delims);
+			while(result!=NULL)
+			{
+				path_array[i]=result;
+				printf("%s\n",path_array[i]);
+				i++;
+				result=strtok(NULL,delims);
+			}
+			
+			//find the cmd in path
+			i=0;
+			int cmd_len=strlen(path);
+			int exe=0;
+			while(i<num)
+			{
+				char *path_cmd=malloc(strlen(path_array[i])+cmd_len+1);
+				strcpy(path_cmd,path_array[i]);
+				strcat(path_cmd,"/");
+				strcat(path_cmd,path);
+				//printf("%s\n",path_cmd);	
+
+				if(stat(path_cmd,&sb)==0 && S_ISREG(sb.st_mode))
+				{
+					pid_t fpid;
+					fpid=fork();
+					if(fpid < 0)
+					{
+						printf("error in fork");
+					}	
+					else if(fpid==0)
+					{
+						size_t length=tokens_get_length(tokens);
+						char *arg[length];
+						get_cmd(path_cmd,arg[0]);
+						size_t i=1;
+						//get arguments of the cmd from input
+						while(i<length)
+						{
+							arg[i]=tokens_get_token(tokens,i);
+							i++;
+						}
+						//the last item of the array of the exec function should be NULL 
+						arg[length]=NULL;
+						execv(path_cmd,arg);
+					}
+					else
+					{
+						wait(NULL);
+					}
+					exe=1;
+					break;
+				}
+	
+				i++;
+			}
+			if(exe!=1)
+			{
+				printf("no such cmd");
+			}
 		}
 	}
 
